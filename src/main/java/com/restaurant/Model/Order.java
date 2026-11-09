@@ -9,8 +9,7 @@ import main.java.com.restaurant.strategy.NoDiscountStrategy;
 
 import java.util.ArrayList;
 import java.util.List;
-
-// Shared Domain Model connecting Factory/Decorator items, Observer notifications, State & Strategy
+// Модель общего домена, соед эл. фабрики/декоратора, уведы наблюдателей, состояние и стратегию
 public class Order {
     private final int orderId;
     private final List<Meal> meals = new ArrayList<>();
@@ -36,7 +35,7 @@ public class Order {
         return orderId;
     }
 
-    // Observer pattern management
+    // Управление шаблонами Observer
     public void addObserver(OrderObserver observer) {
         observers.add(observer);
     }
@@ -51,7 +50,7 @@ public class Order {
         }
     }
 
-    // State pattern transitions (triggers Observer automatically)
+    // переходы по шаблону state (автомат запускает Observer)
     public void setState(OrderState newState) {
         this.state = newState;
         notifyObservers();
