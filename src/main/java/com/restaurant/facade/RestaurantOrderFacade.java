@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 // Student 2 (Alan) - Pattern 6 (Facade): single entry point that coordinates Factory, Decorator,
-// Observer, Strategy and State, and stores every change through the repository (database).
+// Наблюдатель, стратегия и состояние, а также сохраняет каждое изменение в репозитории (базе данных)
 public class RestaurantOrderFacade {
     private static final int FIRST_ORDER_ID = 100;
 
@@ -110,7 +110,7 @@ public class RestaurantOrderFacade {
         System.out.println("------------------------------------------------------------");
     }
 
-    // ---- internals ----
+    // internals
     private Meal buildMeal(String mealType, List<String> toppings) {
         Meal meal = mealFactory.createMeal(mealType);                  // Factory
         if (toppings != null) {
