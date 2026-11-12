@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restaurant Ordering System</title>
+<style>
+  :root {
+    --page: #e3e8e2;
+    --paper: #fffef9;
+    --ink: #1f2a29;
+    --muted: #5d6b69;
+    --line: #c9d1cb;
+    --accent: #0f6b66;
+    --accent-ink: #ffffff;
+    --danger: #9a2f3b;
+    --created: #8a6d1d;
+    --cooking: #b4491f;
+    --ready: #2f7d46;
+    --delivered: #5b6770;
+    --cancelled: #9a2f3b;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--page); }
+  body {
+    margin: 0; color: var(--ink); font: 16px/1.45 var(--sans);
+    min-height: 100vh;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  header {
+    padding: 22px 28px 8px; display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); }
+
+  .layout {
+    display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 24px;
+    padding: 16px 28px 40px; align-items: start;
+  }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 12px 14px 32px; } header { padding: 18px 14px 4px; } }
+
+  .layout > * { min-width: 0; }
+  .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 18px; }
+  .panel h2 { margin: 0 0 12px; font-size: 1.1rem; }
+  .panel h3 { margin: 18px 0 8px; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+  label.field { display: block; font-weight: 600; margin-bottom: 4px; }
+  input[type=text] {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff;
+  }
+
+  .choices { display: grid; gap: 6px; }
+  .choice {
+    display: flex; justify-content: space-between; gap: 10px; padding: 9px 11px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 4px; background: #fff;
+  }
+  .choice:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: #f1f8f6; }
+  .choice:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .choice .price { font-family: var(--mono); color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips .choice { padding: 6px 10px; }
+
+  .btn {
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+    padding: 9px 14px; border-radius: 4px; cursor: pointer; font-weight: 600;
+  }
+  .btn:hover:not(:disabled) { filter: brightness(1.1); }
+  .btn.secondary { background: transparent; color: var(--accent); }
+  .btn.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.block { width: 100%; margin-top: 12px; }
+
+  .draft { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 0.88rem; }
+  .draft li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); align-items: center; }
+  .draft button { border: 0; background: none; color: var(--danger); cursor: pointer; padding: 2px 6px; }
+  .empty { color: var(--muted); font-size: 0.92rem; margin: 6px 0; }
+  .subtotal { display: flex; justify-content: space-between; font-family: var(--mono); font-weight: 700; margin-top: 8px; }
+
+  #message { min-height: 1.4em; margin: 10px 0 0; font-size: 0.92rem; }
+  #message.error { color: var(--danger); }
+  #message.ok { color: var(--ready); }
+
+  /* board */
+  .board-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .board-head h2 { margin: 0; font-size: 1.1rem; }
+  .board-head span { color: var(--muted); font-size: 0.9rem; }
+  .lanes { display: grid; grid-template-columns: repeat(5, minmax(190px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+  .lane { min-width: 190px; }
+  .lane-title { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px 6px; font-weight: 700; border-bottom: 3px solid var(--lane); margin-bottom: 10px; }
+  .lane-title small { color: var(--muted); font-weight: 400; }
+  .lane[data-status=Created] { --lane: var(--created); }
+  .lane[data-status=Cooking] { --lane: var(--cooking); }
+  .lane[data-status=Ready] { --lane: var(--ready); }
+  .lane[data-status=Delivered] { --lane: var(--delivered); }
+  .lane[data-status=Cancelled] { --lane: var(--cancelled); }
+  .lane-body { display: grid; gap: 12px; }
+
+  .ticket {
+    background: var(--paper); border: 1px solid var(--line); border-top: 0; padding: 14px 12px 12px;
+    position: relative; border-radius: 0 0 4px 4px;
+    --notch: radial-gradient(circle at 8px 0, transparent 5px, var(--paper) 5.5px);
+  }
+  .ticket::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px;
+    background: radial-gradient(circle at 8px 8px, var(--page) 5px, var(--paper) 5.5px) 0 0 / 16px 8px repeat-x;
+    border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+  }
+  .ticket header { padding: 0; display: flex; justify-content: space-between; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+  .ticket .num { font-family: var(--mono); font-weight: 700; }
+  .ticket .who { font-weight: 600; overflow-wrap: anywhere; }
+  .ticket ul { list-style: none; margin: 10px 0 8px; padding: 0; font-size: 0.86rem; }
+  .ticket li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+  .ticket li span:last-child { font-family: var(--mono); white-space: nowrap; }
+  .ticket .totals { font-family: var(--mono); font-size: 0.84rem; border-top: 1px dashed var(--ink); padding-top: 6px; }
+  .ticket .totals div { display: flex; justify-content: space-between; gap: 6px; }
+  .ticket .totals .final { font-weight: 700; font-size: 0.95rem; }
+  .ticket .disc { color: var(--muted); font-size: 0.8rem; margin: 0 0 4px; }
+  .ticket .actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .ticket .actions .btn { padding: 6px 10px; font-size: 0.88rem; }
+  .ticket .trail { color: var(--muted); font-size: 0.76rem; margin: 8px 0 0; }
+
+  .log { margin-top: 24px; }
+  .log ol { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; font-family: var(--mono); font-size: 0.82rem; }
+  .log li { padding: 4px 0; border-bottom: 1px dashed var(--line); display: grid; grid-template-columns: 5rem 5.5rem 1fr; gap: 8px; }
+  .log time { color: var(--muted); }
+  .log .ch-customer { color: var(--accent); }
+  .log .ch-kitchen { color: var(--cooking); }
+  @media (prefers-reduced-motion: no-preference) {
+    .ticket.fresh { animation: drop .35s ease-out; }
+    @keyframes drop { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Restaurant Ordering System</h1>
+  <p>Take an order, then move its ticket along the kitchen rail.</p>
+</header>
+
+<main class="layout">
+  <section class="panel" aria-labelledby="new-title">
+    <h2 id="new-title">New order</h2>
+
+    <label class="field" for="customer">Customer name</label>
+    <input type="text" id="customer" autocomplete="off" maxlength="60" placeholder="e.g. Aigerim">
+
+    <h3 id="discount-h">Discount</h3>
+    <div class="choices" id="discounts" role="radiogroup" aria-labelledby="discount-h"></div>
+
+    <h3 id="dish-h">Dish</h3>
+    <div class="choices" id="meals" role="radiogroup" aria-labelledby="dish-h"></div>
+
+    <h3 id="top-h">Extras</h3>
+    <div class="chips" id="toppings" role="group" aria-labelledby="top-h"></div>
+
+    <button class="btn secondary block" id="add-item" type="button">Add dish to order</button>
+
+    <h3>This order</h3>
+    <ul class="draft" id="draft"></ul>
+    <p class="empty" id="draft-empty">No dishes yet. Pick a dish above and add it.</p>
+    <div class="subtotal" id="draft-total" hidden><span>Subtotal</span><span id="draft-sum"></span></div>
+
+    <button class="btn block" id="place" type="button">Place order</button>
+    <p id="message" role="status"></p>
+  </section>
+
+  <section aria-labelledby="board-title">
+    <div class="board-head">
+      <h2 id="board-title">Kitchen rail</h2>
+      <span id="count"></span>
+    </div>
+    <div class="lanes" id="lanes"></div>
+
+    <div class="panel log">
+      <h2>Notifications</h2>
+      <p class="empty" id="log-empty">Customer messages and kitchen board updates appear here when an order changes status.</p>
+      <ol id="log"></ol>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var STATUSES = ["Created", "Cooking", "Ready", "Delivered", "Cancelled"];
+  var NEXT_LABEL = { Created: "Start cooking", Cooking: "Mark ready", Ready: "Deliver" };
+  var menu = null;
+  var draft = [];
+  var seen = {};
+  var firstLoad = true;
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function money(n) { return "$" + Number(n).toFixed(2); }
+
+  function api(method, url, body) {
+    var opts = { method: method, headers: {} };
+    if (body) {
+      opts.headers["Content-Type"] = "application/x-www-form-urlencoded";
+      opts.body = body;
+    }
+    return fetch(url, opts).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) throw new Error(data.error || ("Request failed (" + r.status + ")"));
+        return data;
+      });
+    });
+  }
+
+  function say(text, kind) {
+    var m = $("message");
+    m.textContent = text;
+    m.className = kind || "";
+  }
+
+  // ---------- choices ----------
+  function choice(type, name, value, label, price, checked) {
+    var l = el("label", "choice");
+    var i = el("input");
+    i.type = type; i.name = name; i.value = value; i.checked = !!checked;
+    l.appendChild(i);
+    l.appendChild(el("span", "", label));
+    if (price !== null) l.appendChild(el("span", "price", price));
+    return l;
+  }
+
+  function renderMenu() {
+    var d = $("discounts"); d.textContent = "";
+    menu.discounts.forEach(function (x, idx) { d.appendChild(choice("radio", "discount", x.code, x.name, null, idx === 0)); });
+    var m = $("meals"); m.textContent = "";
+    menu.meals.forEach(function (x, idx) { m.appendChild(choice("radio", "meal", x.code, x.name, money(x.price), idx === 0)); });
+    var t = $("toppings"); t.textContent = "";
+    menu.toppings.forEach(function (x) { t.appendChild(choice("checkbox", "topping", x.code, x.label, "+" + money(x.price), false)); });
+  }
+
+  function selected(name) {
+    return Array.prototype.slice.call(document.querySelectorAll("input[name=" + name + "]:checked")).map(function (i) { return i.value; });
+  }
+
+  // ---------- draft ----------
+  function itemPrice(item) {
+    var meal = menu.meals.filter(function (m) { return m.code === item.meal; })[0];
+    var sum = meal.price;
+    item.toppings.forEach(function (c) {
+      sum += menu.toppings.filter(function (t) { return t.code === c; })[0].price;
+    });
+    return sum;
+  }
+  function itemLabel(item) {
+    var meal = menu.meals.filter(function (m) { return m.code === item.meal; })[0];
+    var extras = item.toppings.map(function (c) { return menu.toppings.filter(function (t) { return t.code === c; })[0].label; });
+    return meal.name + (extras.length ? " + " + extras.join(" + ") : "");
+  }
+
+  function renderDraft() {
+    var ul = $("draft"); ul.textContent = "";
+    var total = 0;
+    draft.forEach(function (item, idx) {
+      var li = el("li");
+      li.appendChild(el("span", "", itemLabel(item)));
+      li.appendChild(el("span", "", money(itemPrice(item))));
+      var rm = el("button", "", "Remove");
+      rm.type = "button";
+      rm.setAttribute("aria-label", "Remove " + itemLabel(item));
+      rm.onclick = function () { draft.splice(idx, 1); renderDraft(); };
+      li.appendChild(rm);
+      ul.appendChild(li);
+      total += itemPrice(item);
+    });
+    $("draft-empty").hidden = draft.length > 0;
+    $("draft-total").hidden = draft.length === 0;
+    $("draft-sum").textContent = money(total);
+  }
+
+  $("add-item").onclick = function () {
+    if (!menu) return;
+    var meal = selected("meal")[0];
+    draft.push({ meal: meal, toppings: selected("topping") });
+    document.querySelectorAll("input[name=topping]").forEach(function (i) { i.checked = false; });
+    say("", "");
+    renderDraft();
+  };
+
+  $("place").onclick = function () {
+    var name = $("customer").value.trim();
+    if (!name) { say("Enter the customer name first.", "error"); $("customer").focus(); return; }
+    if (!draft.length) { say("Add at least one dish before placing the order.", "error"); return; }
+    var params = new URLSearchParams();
+    params.append("customer", name);
+    params.append("discount", selected("discount")[0]);
+    draft.forEach(function (it) { params.append("item", it.meal + ":" + it.toppings.join(",")); });
+    $("place").disabled = true;
+    api("POST", "/api/orders", params.toString()).then(function (order) {
+      draft = []; renderDraft();
+      $("customer").value = "";
+      say("Order #" + order.id + " placed for " + order.customer + ".", "ok");
+      return refresh();
+    }).catch(function (e) { say(e.message, "error"); })
+      .then(function () { $("place").disabled = false; });
+  };
+
+  // ---------- board ----------
+  function ticket(o) {
+    var t = el("article", "ticket" + (seen[o.id] ? "" : " fresh"));
+    seen[o.id] = true;
+    var h = el("header");
+    h.appendChild(el("span", "who", o.customer));
+    h.appendChild(el("span", "num", "#" + o.id));
+    t.appendChild(h);
+
+    var ul = el("ul");
+    o.items.forEach(function (it) {
+      var li = el("li");
+      li.appendChild(el("span", "", it.description));
+      li.appendChild(el("span", "", money(it.price)));
+      ul.appendChild(li);
+    });
+    t.appendChild(ul);
+
+    t.appendChild(el("p", "disc", o.discount.name));
+    var tot = el("div", "totals");
+    var a = el("div"); a.appendChild(el("span", "", "Subtotal")); a.appendChild(el("span", "", money(o.subtotal)));
+    var b = el("div", "final"); b.appendChild(el("span", "", "Total")); b.appendChild(el("span", "", money(o.total)));
+    tot.appendChild(a); tot.appendChild(b);
+    t.appendChild(tot);
+
+    var actions = el("div", "actions");
+    if (o.canAdvance) {
+      var adv = el("button", "btn", NEXT_LABEL[o.status] || "Next");
+      adv.type = "button";
+      adv.onclick = function () { act(o.id, "advance", adv); };
+      actions.appendChild(adv);
+    }
+    if (o.canCancel) {
+      var c = el("button", "btn danger", "Cancel order");
+      c.type = "button";
+      c.onclick = function () { act(o.id, "cancel", c); };
+      actions.appendChild(c);
+    }
+    if (actions.children.length) t.appendChild(actions);
+    return t;
+  }
+
+  function act(id, action, btn) {
+    btn.disabled = true;
+    api("POST", "/api/orders/" + id + "/" + action).then(function () {
+      say("", ""); return refresh();
+    }).catch(function (e) { say(e.message, "error"); return refresh(); });
+  }
+
+  function renderBoard(orders) {
+    var lanes = $("lanes"); lanes.textContent = "";
+    STATUSES.forEach(function (s) {
+      var lane = el("div", "lane"); lane.dataset.status = s;
+      var inLane = orders.filter(function (o) { return o.status === s; }).reverse();
+      var title = el("div", "lane-title");
+      title.appendChild(el("span", "", s));
+      title.appendChild(el("small", "", String(inLane.length)));
+      lane.appendChild(title);
+      var body = el("div", "lane-body");
+      inLane.forEach(function (o) { body.appendChild(ticket(o)); });
+      lane.appendChild(body);
+      lanes.appendChild(lane);
+    });
+    $("count").textContent = orders.length + (orders.length === 1 ? " order" : " orders");
+  }
+
+  function renderLog(events) {
+    var ol = $("log"); ol.textContent = "";
+    events.slice().reverse().forEach(function (e) {
+      var li = el("li");
+      li.appendChild(el("time", "", new Date(e.at).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })));
+      li.appendChild(el("span", "ch-" + e.channel, e.channel === "kitchen" ? "Kitchen" : "Customer"));
+      li.appendChild(el("span", "", e.message));
+      ol.appendChild(li);
+    });
+    $("log-empty").hidden = events.length > 0;
+  }
+
+  function refresh() {
+    return Promise.all([api("GET", "/api/orders"), api("GET", "/api/events")]).then(function (r) {
+      renderBoard(r[0]); renderLog(r[1]); firstLoad = false;
+    });
+  }
+
+  // ---------- start ----------
+  api("GET", "/api/menu").then(function (m) {
+    menu = m; renderMenu(); renderDraft(); return refresh();
+  }).catch(function (e) { say("Cannot reach the server: " + e.message, "error"); });
+
+  setInterval(function () { if (menu && !document.hidden) refresh().catch(function () {}); }, 3000);
+})();
+</script>
+</body>
+</html>
